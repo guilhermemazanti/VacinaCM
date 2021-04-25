@@ -12,7 +12,7 @@ import pandas as pd
 from Piramide_Etaria import get_piramide_etaria
 from Vacinados import get_vacinados
 
-def get_vacinados_por_dia(df, dias_media):
+def get_vacinados_por_dia(df, dias_media = None):
   vacinados_por_dia = df.DATA_APLICACAO_VACINA.value_counts()
   vacinados_por_dia.sort_index(inplace = True)
 
@@ -64,7 +64,6 @@ def plot_total_vacinados(pd_vacinados):
   #vacinados_por_dia = get_vacinados_por_dia(pd_vacinados, None)
   vacinados_por_dia1 = get_vacinados_por_dia(dose1, None)
   vacinados_por_dia2 = get_vacinados_por_dia(dose2, None)
-  vacinados_por_dia2, _ = vacinados_por_dia2.align(vacinados_por_dia1, fill_value = 0)
 
   fig, ax = plt.subplots(figsize = (5, 5))
   ax.set_position([0.15, 0.15, 0.95-0.15, 0.95-0.15])
@@ -73,8 +72,8 @@ def plot_total_vacinados(pd_vacinados):
   #ax.plot(vacinados_por_dia1.cumsum(), label = "1ª dose")
   #ax.plot(vacinados_por_dia2.cumsum(), label = "2ª dose")
   #ax.plot(vacinados_por_dia.cumsum(), label = "Total")
-  ax.stackplot(vacinados_por_dia1.index, vacinados_por_dia1.cumsum().values,\
-               vacinados_por_dia2.cumsum().values, labels = ("1ª dose", "2ª dose"))
+  ax.stackplot(vacinados_por_dia1.index, vacinados_por_dia1.cumsum().values, labels = ("1ª dose",))
+  ax.stackplot(vacinados_por_dia2.index, vacinados_por_dia2.cumsum().values, labels = ("2ª dose",))
   ax.set_title("Evolução do total de vacinados")
   ax.set_xlabel("Dia")
   ax.set_ylabel("Total de vacinados")
@@ -170,6 +169,63 @@ def get_datas_finais(pd_vacinados, populacao_CM, dias_media):
   data_final2 = pd.Timestamp.today() + dias_para_final2
   return data_final, data_final1, data_final2
 
+def plot_por_tipo_de_vacina(pd_vacinados):
+  tipos = np.unique(pd_vacinados.IMUNOBIOLOGICO.values)
+
+  fig, ax = plt.subplots(figsize = (5, 5))
+  ax.set_position([0.15, 0.15, 0.95-0.15, 0.95-0.15])
+  ax.grid(True)
+  ax.set_axisbelow(True)
+  for tipo in tipos:
+    vacinados_tipo = get_vacinados_por_dia(pd_vacinados[pd_vacinados.IMUNOBIOLOGICO==tipo], None)
+    ax.plot(vacinados_tipo.cumsum(), label = tipo)
+  ax.legend()
+  ax.set_xlabel("Dia")
+  ax.set_ylabel("Total de doses aplicadas")
+  ax.set_title("Total de doses aplicadas por tipo de vacina")
+
+  for t in ax.get_xticklabels():
+    t.set_rotation(15)
+
+  fig.savefig("Gráficos/Total_por_tipo_{}.png".format(pd.Timestamp.today().strftime("%Y_%m_%d")))
+
+def plot_Mazanti(pd_vacinados, inicio = pd.Timestamp(2021, 1, 21)):
+  """
+  Quantidade de pessoas da família Mazanti que foram vacinadas
+  """
+  Mazanti = pd_vacinados[pd_vacinados.NOME_PACIENTE.apply(lambda x: "MAZANTI" in x)]
+
+  hoje = pd.Timestamp.today()
+
+  dose = []
+  dose.append(pd.Series(index = np.arange(inicio, hoje, pd.Timedelta(1, unit = "day")), dtype = int))
+  dose.append(pd.Series(index = np.arange(inicio, hoje, pd.Timedelta(1, unit = "day")), dtype = int))
+
+  for i in [1, 2]:
+    for _, dia in Mazanti[Mazanti.DOSE==i].DATA_APLICACAO_VACINA.iteritems():
+      dose[i-1][dia] += 1
+
+  fig, ax = plt.subplots(figsize = (5, 5))
+  ax.set_position([0.1, 0.15, 0.95-0.1, 0.95-0.15])
+  ax.grid(True)
+  ax.set_axisbelow(True)
+  #ax.plot(vacinados_por_dia1.cumsum(), label = "1ª dose")
+  #ax.plot(vacinados_por_dia2.cumsum(), label = "2ª dose")
+  #ax.plot(vacinados_por_dia.cumsum(), label = "Total")
+  for i in [0, 1]:
+    ax.stackplot(dose[i].index, dose[i].cumsum().values, labels = ("{}ª dose".format(i+1),))
+  ax.set_title("Evolução do total de Mazanti vacinados")
+  ax.set_xlabel("Dia")
+  ax.set_ylabel("Total de Mazanti vacinados")
+  ax.legend(loc = "upper left")
+
+  ymin, ymax = ax.get_ylim()
+  ax.set_yticks(range(0, int(ymax)+1))
+
+  for t in ax.get_xticklabels():
+    t.set_rotation(15)
+
+  fig.savefig("Gráficos/Mazanti_vacinados_{}.png".format(pd.Timestamp.today().strftime("%Y_%m_%d")))
 
 if __name__ == "__main__":
   plt.close("all")
@@ -185,6 +241,8 @@ if __name__ == "__main__":
   plot_vacinados_por_dia(pd_vacinados, 14)
   plot_por_idade(pd_vacinados, pd_piramide)
   plot_total_vacinados(pd_vacinados)
+  plot_por_tipo_de_vacina(pd_vacinados)
+  plot_Mazanti(pd_vacinados)
   data_final, data_final1, data_final2 = get_datas_finais(pd_vacinados, populacao_CM, 14)
 
   print(data_final, data_final1, data_final2)
