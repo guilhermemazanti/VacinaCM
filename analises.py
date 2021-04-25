@@ -8,6 +8,7 @@ Created on Sun Apr 25 00:23:26 2021
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.animation import FuncAnimation
 
 from Piramide_Etaria import get_piramide_etaria
 from Vacinados import get_vacinados
@@ -227,6 +228,53 @@ def plot_Mazanti(pd_vacinados, inicio = pd.Timestamp(2021, 1, 21)):
 
   fig.savefig("Gráficos/Mazanti_vacinados_{}.png".format(pd.Timestamp.today().strftime("%Y_%m_%d")))
 
+def animacao_por_idade(pd_vacinados):
+  inicio = min(pd_vacinados.DATA_APLICACAO_VACINA)
+  umDia = pd.Timedelta(1, unit = "day")
+  hoje = pd.Timestamp.today()
+
+  dose1 = pd_vacinados[pd_vacinados.DOSE==1]
+  dose2 = pd_vacinados[pd_vacinados.DOSE==2]
+
+  x_max = max(get_pd_por_idade(dose1))
+
+  fig, ax = plt.subplots(figsize = (5, 5))
+  ax.set_position([0.2, 0.11, 0.95-0.2, 0.95-0.11])
+  ax.grid(True)
+  ax.set_axisbelow(True)
+  bars1 = ax.barh(range(0, 110, 10), [0]*11, height = 8, label = "1ª dose")
+  bars2 = ax.barh(range(0, 110, 10), [0]*11, height = 8, label = "2ª dose")
+  ax.set_yticks(range(0, 110, 10))
+  labels = ["{} a {}".format(i, i+9) for i in range(0, 100, 10)]
+  labels.append("≥ 100")
+  ax.set_yticklabels(labels)
+  ax.set_ylabel("Faixa etária")
+  ax.set_xlabel("Quantidade de vacinados")
+  ax.set_title("Quantidade de vacinados por faixa etária")
+  ax.legend()
+  texto_dia = ax.text(1400, 0, inicio.strftime("%d/%m/%Y"),\
+                      ha = "center", va = "center",\
+                      bbox = {"boxstyle": "round", "facecolor": "white"})
+
+  def init():
+    ax.set_xlim([0, x_max])
+    return bars1.patches + bars2.patches + [texto_dia]
+
+  def update(dia):
+    texto_dia.set_text(pd.to_datetime(dia).strftime("%d/%m/%Y"))
+    df1 = get_pd_por_idade(dose1[dose1.DATA_APLICACAO_VACINA <= dia]).reindex(range(0, 110, 10), fill_value = 0)
+    df2 = get_pd_por_idade(dose2[dose2.DATA_APLICACAO_VACINA <= dia]).reindex(range(0, 110, 10), fill_value = 0)
+    for i, bar in enumerate(bars1.patches):
+      bar.set_width(df1[10*i])
+    for i, bar in enumerate(bars2.patches):
+      bar.set_width(df2[10*i])
+    return bars1.patches + bars2.patches + [texto_dia]
+
+  ani = FuncAnimation(fig, update, frames = np.arange(inicio, hoje+umDia, umDia),\
+                      init_func = init, blit = True, interval = 333, repeat_delay = 1000)
+  ani.save("Gráficos/Animacao_por_idade_{}.mp4".format(pd.Timestamp.today().strftime("%Y_%m_%d")))
+  return ani
+
 if __name__ == "__main__":
   plt.close("all")
   populacao_CM = 31346 # Fonte : https://cidades.ibge.gov.br/brasil/sp/candido-mota/panorama
@@ -246,3 +294,5 @@ if __name__ == "__main__":
   data_final, data_final1, data_final2 = get_datas_finais(pd_vacinados, populacao_CM, 14)
 
   print(data_final, data_final1, data_final2)
+
+  ani = animacao_por_idade(pd_vacinados)
